@@ -12,6 +12,7 @@
 #include "ringbuf.h"
 
 #define ELEMENTSOF(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define tmalloc(count, type) ((type *) malloc((count) * sizeof(type)))
 
 void dequeue_and_print(ringbuf *r) {
 	char c;
@@ -95,7 +96,7 @@ void *producer_func(void *arg)
 {
 	ringbuf *r = (ringbuf *) arg;
 
-	unsigned int count = rand_between(10, 20);
+	unsigned int count = rand_between((int) (r->size * 1.5), r->size * 2);
 	while (count--) {
 		char c = rand_between('A', 'z');
 		fprintf(stderr, "Enqueue %c\n", c);
@@ -111,16 +112,23 @@ void *producer_func(void *arg)
 
 typedef struct consumer_arg {
 	ringbuf *r;
-	unsigned int stop_flag;
+	unsigned int producer_has_exited;
 } consumer_arg;
 
 void *consumer_func(void *arg)
 {
 	consumer_arg *carg = (consumer_arg *) arg;
 
-	while (!carg->stop_flag) {
+	for (;;) {
 		char c;
-		ringbuf_dequeue_blocking(carg->r, &c);
+		if (carg->producer_has_exited) {
+			if (ringbuf_dequeue(carg->r, &c) < 0) {
+				/* EOF */
+				break;
+			}
+		} else {
+			ringbuf_dequeue_blocking(carg->r, &c);
+		}
 		fprintf(stderr, "Dequeued %c\n", c);
 		ringbuf_dump(carg->r);
 		unsigned int secs = rand_between(0, 5);
@@ -136,11 +144,15 @@ void test_multithreaded(const char *test_name)
 	fprintf(stderr, "Test %s\n", test_name);
 
 	ringbuf r;
-	datum ringbuf_arr[5];
+	datum *ringbuf_arr = tmalloc(100, char);
+	if (NULL == ringbuf_arr) {
+		perror("malloc");
+		return;
+	}
 	memset(&r, 0, sizeof(r));
-	memset(ringbuf_arr, 0, sizeof(ringbuf_arr));
+	memset(ringbuf_arr, 0, 100 * sizeof(char));
 
-	ringbuf_init(&r, ELEMENTSOF(ringbuf_arr), ringbuf_arr);
+	ringbuf_init(&r, 100, ringbuf_arr);
 	ringbuf_dump(&r);
 
 	pthread_t producer, consumer;
@@ -148,16 +160,14 @@ void test_multithreaded(const char *test_name)
 	if (pthread_create(&producer, NULL, producer_func, &r) < 0) {
 		perror("pthread_create");
 	}
-	consumer_arg carg = { .r = &r, .stop_flag = 0 };
+	consumer_arg carg = { .r = &r, .producer_has_exited = 0 };
 	if (pthread_create(&consumer, NULL, consumer_func, &carg) < 0) {
 		perror("pthread_create");
 	}
 	if (pthread_join(producer, NULL) < 0) {
 		perror("pthread_join");
 	}
-	/* give consumer time to process data */
-	sleep(1);
-	carg.stop_flag = 1;
+	carg.producer_has_exited = 1;
 	if (pthread_join(consumer, NULL) < 0) {
 		perror("pthread_join");
 	}
