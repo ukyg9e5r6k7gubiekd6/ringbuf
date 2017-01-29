@@ -21,6 +21,14 @@ void ringbuf_init(ringbuf *r, size_t size, datum *arr)
 		perror("pthread_mutex_init");
 	}
 #endif /* RINGBUF_MUTEX */
+#ifdef RINGBUF_BLOCKING
+	if (pthread_cond_init(&r->cond_notfull, NULL) < 0) {
+		perror("pthread_cond_init");
+	}
+	if (pthread_cond_init(&r->cond_notempty, NULL) < 0) {
+		perror("pthread_cond_init");
+	}
+#endif /* RINGBUF_BLOCKING */
 }
 
 void ringbuf_fini(ringbuf *r)
@@ -30,6 +38,14 @@ void ringbuf_fini(ringbuf *r)
 		perror("pthread_mutex_destroy");
 	}
 #endif /* RINGBUF_MUTEX */
+#ifdef RINGBUF_BLOCKING
+	if (pthread_cond_destroy(&r->cond_notfull) < 0) {
+		perror("pthread_cond_destroy");
+	}
+	if (pthread_cond_destroy(&r->cond_notempty) < 0) {
+		perror("pthread_cond_destroy");
+	}
+#endif /* RINGBUF_BLOCKING */
 }
 
 static inline datum *wrap_ptr(const ringbuf *r, datum *d)
@@ -71,6 +87,12 @@ int ringbuf_enqueue(ringbuf *r, const datum *d)
 	}
 	r->writepos = wrap_ptr(r, r->writepos + 1);
 
+#ifdef RINGBUF_BLOCKING
+	if (pthread_cond_signal(&r->cond_notempty) < 0) {
+		perror("pthread_cond_signal");
+	}
+#endif /* RINGBUF_BLOCKING */
+
 #ifdef RINGBUF_MUTEX
 	if (pthread_mutex_unlock(&r->mutex) < 0) {
 		perror("pthread_mutex_unlock");
@@ -80,6 +102,57 @@ int ringbuf_enqueue(ringbuf *r, const datum *d)
 
 	return overflow;
 }
+
+#ifdef RINGBUF_BLOCKING
+int ringbuf_enqueue_blocking(ringbuf *r, const datum *d)
+{
+	const datum *new_writepos;
+
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_lock(&r->mutex)) {
+		perror("pthread_mutex_lock");
+		return -2;
+	}
+#endif /* RINGBUF_MUTEX */
+
+	for(;;) {
+		new_writepos = wrap_ptr(r, r->writepos + 1);
+		if (r->readpos != NULL && new_writepos == r->readpos) {
+			/* full - wait for room */
+			if (pthread_cond_wait(&r->cond_notfull, &r->mutex) < 0) {
+				perror("pthread_cond_wait");
+			}
+			/* could be a spurious wakeup */
+		} else {
+			break;
+		}
+	}
+
+#ifdef RINGBUF_ASSIGN_DATA
+	*(r->writepos) = *d;
+#else /* ndef RINGBUF_ASSIGN_DATA */
+	memcpy(r->writepos, d, sizeof(*d));
+#endif /* ndef RINGBUF_ASSIGN_DATA */
+	if (NULL == r->readpos) {
+		/* no longer empty */
+		r->readpos = r->writepos;
+	}
+	r->writepos = wrap_ptr(r, r->writepos + 1);
+
+	if (pthread_cond_signal(&r->cond_notempty) < 0) {
+		perror("pthread_cond_signal");
+	}
+
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_unlock(&r->mutex) < 0) {
+		perror("pthread_mutex_unlock");
+		return -2;
+	}
+#endif /* RINGBUF_MUTEX */
+
+	return 0;
+}
+#endif /* RINGBUF_BLOCKING */
 
 int ringbuf_dequeue(ringbuf *r, datum *d)
 {
@@ -111,6 +184,12 @@ int ringbuf_dequeue(ringbuf *r, datum *d)
 		}
 	}
 
+#ifdef RINGBUF_BLOCKING
+	if (pthread_cond_signal(&r->cond_notfull) < 0) {
+		perror("pthread_cond_signal");
+	}
+#endif /* RINGBUF_BLOCKING */
+
 #ifdef RINGBUF_MUTEX
 	if (pthread_mutex_unlock(&r->mutex) < 0) {
 		perror("pthread_mutex_unlock");
@@ -120,6 +199,55 @@ int ringbuf_dequeue(ringbuf *r, datum *d)
 
 	return underflow;
 }
+
+#ifdef RINGBUF_BLOCKING
+int ringbuf_dequeue_blocking(ringbuf *r, datum *d)
+{
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_lock(&r->mutex) < 0) {
+		perror("pthread_mutex_lock");
+		return -2;
+	}
+#endif /* RINGBUF_MUTEX */
+
+	for (;;) {
+		if (NULL == r->readpos) {
+			/* empty */
+			if (pthread_cond_wait(&r->cond_notempty, &r->mutex) < 0) {
+				perror("pthread_cond_wait");
+			}
+			/* could be a spurious wakeup */
+		} else {
+			break;
+		}
+	}
+#ifdef RINGBUF_ASSIGN_DATA
+	*d = *(r->readpos);
+#else /* ndef RINGBUF_ASSIGN_DATA */
+	memcpy(d, r->readpos, sizeof(*d));
+#endif /* ndef RINGBUF_ASSIGN_DATA */
+	datum *new_readpos = wrap_ptr(r, r->readpos + 1);
+	if (new_readpos == r->writepos) {
+		/* now empty */
+		r->readpos = NULL;
+	} else {
+		r->readpos = new_readpos;
+	}
+
+	if (pthread_cond_signal(&r->cond_notfull) < 0) {
+		perror("pthread_cond_signal");
+	}
+
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_unlock(&r->mutex) < 0) {
+		perror("pthread_mutex_unlock");
+		return -2;
+	}
+#endif /* RINGBUF_MUTEX */
+
+	return 0;
+}
+#endif /* RINGBUF_BLOCKING */
 
 void ringbuf_dump(const ringbuf *r)
 {
