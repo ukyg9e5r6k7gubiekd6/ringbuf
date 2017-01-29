@@ -88,8 +88,8 @@ int ringbuf_enqueue(ringbuf *r, const datum *d)
 	r->writepos = wrap_ptr(r, r->writepos + 1);
 
 #ifdef RINGBUF_BLOCKING
-	if (pthread_cond_signal(&r->cond_notempty) < 0) {
-		perror("pthread_cond_signal");
+	if (pthread_cond_broadcast(&r->cond_notempty) < 0) {
+		perror("pthread_cond_broadcast");
 	}
 #endif /* RINGBUF_BLOCKING */
 
@@ -139,8 +139,8 @@ int ringbuf_enqueue_blocking(ringbuf *r, const datum *d)
 	}
 	r->writepos = wrap_ptr(r, r->writepos + 1);
 
-	if (pthread_cond_signal(&r->cond_notempty) < 0) {
-		perror("pthread_cond_signal");
+	if (pthread_cond_broadcast(&r->cond_notempty) < 0) {
+		perror("pthread_cond_broadcast");
 	}
 
 #ifdef RINGBUF_MUTEX
@@ -185,8 +185,8 @@ int ringbuf_dequeue(ringbuf *r, datum *d)
 	}
 
 #ifdef RINGBUF_BLOCKING
-	if (pthread_cond_signal(&r->cond_notfull) < 0) {
-		perror("pthread_cond_signal");
+	if (pthread_cond_broadcast(&r->cond_notfull) < 0) {
+		perror("pthread_cond_broadcast");
 	}
 #endif /* RINGBUF_BLOCKING */
 
@@ -234,8 +234,8 @@ int ringbuf_dequeue_blocking(ringbuf *r, datum *d)
 		r->readpos = new_readpos;
 	}
 
-	if (pthread_cond_signal(&r->cond_notfull) < 0) {
-		perror("pthread_cond_signal");
+	if (pthread_cond_broadcast(&r->cond_notfull) < 0) {
+		perror("pthread_cond_broadcast");
 	}
 
 #ifdef RINGBUF_MUTEX
