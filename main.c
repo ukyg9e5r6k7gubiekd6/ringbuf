@@ -10,6 +10,8 @@
 
 #include "ringbuf.h"
 
+#define ELEMENTSOF(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 void dequeue_and_print(ringbuf *r) {
 	char c;
 
@@ -20,12 +22,16 @@ void dequeue_and_print(ringbuf *r) {
 	}
 }
 
-void test_overflow(void)
+void test_overflow(const char *test_name)
 {
-	ringbuf r;
-	memset(&r, 0, sizeof(r));
+	fprintf(stderr, "Test %s\n", test_name);
 
-	ringbuf_init(&r);
+	ringbuf r;
+	datum ringbuf_arr[5];
+	memset(&r, 0, sizeof(r));
+	memset(ringbuf_arr, 0, sizeof(ringbuf_arr));
+
+	ringbuf_init(&r, ELEMENTSOF(ringbuf_arr), ringbuf_arr);
 	ringbuf_dump(&r);
 
 	ringbuf_enqueue(&r, "0");
@@ -49,12 +55,16 @@ void test_overflow(void)
 	ringbuf_dump(&r);
 }
 
-void test_underflow()
+void test_underflow(const char *test_name)
 {
-	ringbuf r;
-	memset(&r, 0, sizeof(r));
+	fprintf(stderr, "Test %s\n", test_name);
 
-	ringbuf_init(&r);
+	ringbuf r;
+	datum ringbuf_arr[5];
+	memset(&r, 0, sizeof(r));
+	memset(ringbuf_arr, 0, sizeof(ringbuf_arr));
+
+	ringbuf_init(&r, ELEMENTSOF(ringbuf_arr), ringbuf_arr);
 	ringbuf_dump(&r);
 
 	ringbuf_enqueue(&r, "0");
@@ -65,7 +75,7 @@ void test_underflow()
 	dequeue_and_print(&r);
 	dequeue_and_print(&r);
 	dequeue_and_print(&r);
-#if 0
+#if 1
 	dequeue_and_print(&r);
 #endif
 	ringbuf_dump(&r);
@@ -73,6 +83,7 @@ void test_underflow()
 
 int main(int argc, char **argv)
 {
-	test_underflow();
+	test_underflow("underflow");
+	test_overflow("overflow");
 	return EXIT_SUCCESS;
 }

@@ -10,16 +10,18 @@
 
 #include "ringbuf.h"
 
-void ringbuf_init(ringbuf *r)
+void ringbuf_init(ringbuf *r, size_t size, datum *arr)
 {
+	r->size = size;
 	r->readpos = NULL;
+	r->arr = arr;
 	r->writepos = &r->arr[0];
 }
 
 static inline datum *wrap_ptr(const ringbuf *r, datum *d)
 {
-	if (d >= &r->arr[ELEMENTSOF(r->arr)]) {
-		return d - ELEMENTSOF(r->arr);
+	if (d >= &r->arr[r->size]) {
+		return d - r->size;
 	}
 	return d;
 }
@@ -87,7 +89,7 @@ void ringbuf_dump(const ringbuf *r)
 		(NULL == r->writepos) ? -1 : (r->writepos - &r->arr[0])
 	);
 	fputc('|', stderr);
-	for (p = &r->arr[0]; p < &r->arr[ELEMENTSOF(r->arr)]; p++) {
+	for (p = &r->arr[0]; p < &r->arr[r->size]; p++) {
 		fputc(*p ? *p : ' ', stderr);
 		fputc('|', stderr);
 	}

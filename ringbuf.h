@@ -7,9 +7,6 @@
 #ifndef RINGBUF_H_
 #define RINGBUF_H_
 
-#define ELEMENTSOF(arr) (sizeof(arr) / sizeof((arr)[0]))
-
-#define RINGBUF_SIZE 5
 #define RINGBUF_ASSIGN_DATA
 
 struct ringbuf;
@@ -19,11 +16,12 @@ typedef char datum;
 
 struct ringbuf {
 	datum *writepos;
-	datum arr[RINGBUF_SIZE];
+	size_t size;
 	datum *readpos;
+	datum *arr;
 };
 
-void ringbuf_init(ringbuf *r);
+void ringbuf_init(ringbuf *r, size_t size, datum *arr);
 int ringbuf_enqueue(ringbuf *r, const datum *d);
 int ringbuf_dequeue(ringbuf *r, datum *d);
 void ringbuf_dump(const ringbuf *r);
