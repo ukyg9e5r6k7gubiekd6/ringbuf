@@ -17,7 +17,18 @@ void ringbuf_init(ringbuf *r, size_t size, datum *arr)
 	r->arr = arr;
 	r->writepos = &r->arr[0];
 #ifdef RINGBUF_MUTEX
-	pthread_mutex_init(&r->mutex, NULL);
+	if (pthread_mutex_init(&r->mutex, NULL) < 0) {
+		perror("pthread_mutex_init");
+	}
+#endif /* RINGBUF_MUTEX */
+}
+
+void ringbuf_fini(ringbuf *r)
+{
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_destroy(&r->mutex) < 0) {
+		perror("pthread_mutex_destroy");
+	}
 #endif /* RINGBUF_MUTEX */
 }
 

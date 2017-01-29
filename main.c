@@ -53,6 +53,8 @@ void test_overflow(const char *test_name)
 
 	dequeue_and_print(&r);
 	ringbuf_dump(&r);
+
+	ringbuf_fini(&r);
 }
 
 void test_underflow(const char *test_name)
@@ -79,6 +81,8 @@ void test_underflow(const char *test_name)
 	dequeue_and_print(&r);
 #endif
 	ringbuf_dump(&r);
+
+	ringbuf_fini(&r);
 }
 
 int main(int argc, char **argv)

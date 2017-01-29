@@ -30,6 +30,7 @@ struct ringbuf {
 };
 
 void ringbuf_init(ringbuf *r, size_t size, datum *arr);
+void ringbuf_fini(ringbuf *r);
 int ringbuf_enqueue(ringbuf *r, const datum *d);
 int ringbuf_dequeue(ringbuf *r, datum *d);
 void ringbuf_dump(const ringbuf *r);
