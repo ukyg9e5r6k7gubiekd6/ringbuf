@@ -43,6 +43,6 @@ int ringbuf_dequeue(ringbuf *r, datum *d);
 #ifdef RINGBUF_BLOCKING
 int ringbuf_dequeue_blocking(ringbuf *r, datum *d);
 #endif /* RINGBUF_BLOCKING */
-void ringbuf_dump(const ringbuf *r);
+void ringbuf_dump(ringbuf *r);
 
 #endif /* RINGBUF_H_ */

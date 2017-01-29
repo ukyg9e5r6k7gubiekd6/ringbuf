@@ -249,9 +249,15 @@ int ringbuf_dequeue_blocking(ringbuf *r, datum *d)
 }
 #endif /* RINGBUF_BLOCKING */
 
-void ringbuf_dump(const ringbuf *r)
+void ringbuf_dump(ringbuf *r)
 {
 	const datum *p;
+
+#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_lock(&r->mutex) < 0) {
+		perror("pthread_mutex_lock");
+	}
+#endif /* RINGBUF_MUTEX */
 
 	fprintf(stderr,
 		"r=%ld, w=%ld\n",
@@ -300,4 +306,10 @@ void ringbuf_dump(const ringbuf *r)
 	}
 	fputc('\n', stderr);
 	fputc('\n', stderr);
+
+	#ifdef RINGBUF_MUTEX
+	if (pthread_mutex_unlock(&r->mutex) < 0) {
+		perror("pthread_mutex_unlock");
+	}
+#endif /* RINGBUF_MUTEX */
 }
